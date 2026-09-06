@@ -1,19 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
-import { storage } from "./storage";
 import { Wrench, Zap, ShoppingBag, Search, Plus, Phone, MessageCircle, ShieldCheck, Clock, X, Check, ChevronLeft, Stamp, User, LogOut, Lightbulb, Sparkles, Rocket, Camera } from "lucide-react";
 
 // ---------- Design tokens ----------
-// Palette: atelier / carnet d'ouvrier — bleu nuit (fond nav), papier kraft clair (fond page),
-// ambre "sécurité électrique" comme accent, vert tampon pour validation.
+// Palette moderne et sobre, inspirée des grands sites d'annonces africains (type Afribaba) :
+// fond clair, accent orange vif, cartes blanches avec photo, typographie sans-serif unique.
 const C = {
-  ink: "#1C2530",       // bleu-nuit profond
-  paper: "#F1ECE1",     // kraft clair
-  paperDeep: "#E4DCC9",
-  amber: "#D98E2B",     // accent ambre / avertissement électrique
-  amberDeep: "#B5701C",
-  stamp: "#3F6E4E",     // vert tampon "vérifié"
-  rust: "#A8412E",      // rouge rouille / refus
-  line: "#C9BFA8",
+  ink: "#181A20",       // texte principal, quasi noir
+  paper: "#F4F5F7",     // fond général clair
+  paperDeep: "#E8EAED",
+  amber: "#FF6A00",     // orange vif — couleur de marque / CTA
+  amberDeep: "#DA5800",
+  stamp: "#1E9E5A",     // vert validation
+  rust: "#E4382E",
+  line: "#E4E6EA",
 };
 
 const ICONS = { zap: Zap, wrench: Wrench, bag: ShoppingBag };
@@ -89,7 +88,7 @@ function useLocalUser() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await storage.get("session");
+        const r = await window.storage.get("session");
         if (r?.value) setMe(JSON.parse(r.value));
       } catch (e) {}
     })();
@@ -97,13 +96,13 @@ function useLocalUser() {
   const save = async (u) => {
     setMe(u);
     try {
-      await storage.set("session", JSON.stringify(u));
+      await window.storage.set("session", JSON.stringify(u));
     } catch (e) {}
   };
   const clear = async () => {
     setMe(null);
     try {
-      await storage.delete("session");
+      await window.storage.delete("session");
     } catch (e) {}
   };
   return [me, save, clear];
@@ -111,6 +110,7 @@ function useLocalUser() {
 
 export default function App() {
   const [view, setView] = useState({ name: "home" });
+  const [q, setQ] = useState("");
   const [me, setMe, clearMe] = useLocalUser();
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
@@ -127,12 +127,12 @@ export default function App() {
 
   const loadUsers = useCallback(async () => {
     try {
-      const idx = await storage.get("user-index", true);
+      const idx = await window.storage.get("user-index", true);
       const ids = idx?.value ? JSON.parse(idx.value) : [];
       const list = [];
       for (const id of ids) {
         try {
-          const r = await storage.get(`user:${id}`, true);
+          const r = await window.storage.get(`user:${id}`, true);
           if (r?.value) list.push(JSON.parse(r.value));
         } catch (e) {}
       }
@@ -145,11 +145,11 @@ export default function App() {
 
   const loadCategories = useCallback(async () => {
     try {
-      const r = await storage.get("categories", true);
+      const r = await window.storage.get("categories", true);
       if (r?.value) {
         setCategories(JSON.parse(r.value));
       } else {
-        await storage.set("categories", JSON.stringify(DEFAULT_CATEGORIES), true);
+        await window.storage.set("categories", JSON.stringify(DEFAULT_CATEGORIES), true);
         setCategories(DEFAULT_CATEGORIES);
       }
     } catch (e) {
@@ -159,12 +159,12 @@ export default function App() {
 
   const loadSuggestions = useCallback(async () => {
     try {
-      const idx = await storage.get("suggestion-index", true);
+      const idx = await window.storage.get("suggestion-index", true);
       const ids = idx?.value ? JSON.parse(idx.value) : [];
       const list = [];
       for (const id of ids) {
         try {
-          const r = await storage.get(`suggestion:${id}`, true);
+          const r = await window.storage.get(`suggestion:${id}`, true);
           if (r?.value) list.push(JSON.parse(r.value));
         } catch (e) {}
       }
@@ -184,12 +184,12 @@ export default function App() {
 
   const loadReports = useCallback(async () => {
     try {
-      const idx = await storage.get("report-index", true);
+      const idx = await window.storage.get("report-index", true);
       const ids = idx?.value ? JSON.parse(idx.value) : [];
       const list = [];
       for (const id of ids) {
         try {
-          const r = await storage.get(`report:${id}`, true);
+          const r = await window.storage.get(`report:${id}`, true);
           if (r?.value) list.push(JSON.parse(r.value));
         } catch (e) {}
       }
@@ -201,21 +201,21 @@ export default function App() {
 
   const addReport = async (userId, userName, reason) => {
     const r = { id: uid(), userId, userName, reason, from: me?.name || "Visiteur", createdAt: Date.now(), status: "new" };
-    const idxR = await storage.get("report-index", true).catch(() => null);
+    const idxR = await window.storage.get("report-index", true).catch(() => null);
     const ids = idxR?.value ? JSON.parse(idxR.value) : [];
-    await storage.set("report-index", JSON.stringify([...ids, r.id]), true);
-    await storage.set(`report:${r.id}`, JSON.stringify(r), true);
+    await window.storage.set("report-index", JSON.stringify([...ids, r.id]), true);
+    await window.storage.set(`report:${r.id}`, JSON.stringify(r), true);
     await loadReports();
   };
 
   const updateReport = async (r) => {
-    await storage.set(`report:${r.id}`, JSON.stringify(r), true);
+    await window.storage.set(`report:${r.id}`, JSON.stringify(r), true);
     await loadReports();
   };
 
   const loadBoostHistory = useCallback(async () => {
     try {
-      const r = await storage.get("boost-history", true);
+      const r = await window.storage.get("boost-history", true);
       setBoostHistory(r?.value ? JSON.parse(r.value) : []);
     } catch (e) {
       setBoostHistory([]);
@@ -223,58 +223,58 @@ export default function App() {
   }, []);
 
   const logBoostHistory = async (entry) => {
-    const r = await storage.get("boost-history", true).catch(() => null);
+    const r = await window.storage.get("boost-history", true).catch(() => null);
     const list = r?.value ? JSON.parse(r.value) : [];
     const next = [...list, entry];
-    await storage.set("boost-history", JSON.stringify(next), true);
+    await window.storage.set("boost-history", JSON.stringify(next), true);
     setBoostHistory(next);
   };
 
   const addCategory = async ({ label, icon }) => {
     const cat = { id: `${slugify(label)}-${uid().slice(0, 4)}`, label, icon: icon || "wrench" };
     const next = [...categories, cat];
-    await storage.set("categories", JSON.stringify(next), true);
+    await window.storage.set("categories", JSON.stringify(next), true);
     setCategories(next);
     return cat;
   };
 
   const renameCategory = async (id, label) => {
     const next = categories.map((c) => (c.id === id ? { ...c, label } : c));
-    await storage.set("categories", JSON.stringify(next), true);
+    await window.storage.set("categories", JSON.stringify(next), true);
     setCategories(next);
   };
 
   const deleteCategory = async (id) => {
     const next = categories.filter((c) => c.id !== id);
-    await storage.set("categories", JSON.stringify(next), true);
+    await window.storage.set("categories", JSON.stringify(next), true);
     setCategories(next);
   };
 
   const addSuggestion = async (text) => {
     const s = { id: uid(), text, from: me?.name || "Visiteur", createdAt: Date.now(), status: "new" };
-    const idxR = await storage.get("suggestion-index", true).catch(() => null);
+    const idxR = await window.storage.get("suggestion-index", true).catch(() => null);
     const ids = idxR?.value ? JSON.parse(idxR.value) : [];
-    await storage.set("suggestion-index", JSON.stringify([...ids, s.id]), true);
-    await storage.set(`suggestion:${s.id}`, JSON.stringify(s), true);
+    await window.storage.set("suggestion-index", JSON.stringify([...ids, s.id]), true);
+    await window.storage.set(`suggestion:${s.id}`, JSON.stringify(s), true);
     await loadSuggestions();
   };
 
   const updateSuggestion = async (s) => {
-    await storage.set(`suggestion:${s.id}`, JSON.stringify(s), true);
+    await window.storage.set(`suggestion:${s.id}`, JSON.stringify(s), true);
     await loadSuggestions();
   };
 
   const addUser = async (u) => {
-    const idxR = await storage.get("user-index", true).catch(() => null);
+    const idxR = await window.storage.get("user-index", true).catch(() => null);
     const ids = idxR?.value ? JSON.parse(idxR.value) : [];
     const nextIds = [...ids, u.id];
-    await storage.set("user-index", JSON.stringify(nextIds), true);
-    await storage.set(`user:${u.id}`, JSON.stringify(u), true);
+    await window.storage.set("user-index", JSON.stringify(nextIds), true);
+    await window.storage.set(`user:${u.id}`, JSON.stringify(u), true);
     await loadUsers();
   };
 
   const updateUser = async (u) => {
-    await storage.set(`user:${u.id}`, JSON.stringify(u), true);
+    await window.storage.set(`user:${u.id}`, JSON.stringify(u), true);
     await loadUsers();
     if (me?.id === u.id) setMe(u);
   };
@@ -318,30 +318,30 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: "'Georgia', serif", color: C.ink }}>
+    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: "'Inter', -apple-system, sans-serif", color: C.ink }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         body { margin:0; }
-        .disp { font-family:'Archivo Black', sans-serif; letter-spacing:-0.01em; }
-        .sans { font-family:'Archivo', sans-serif; }
-        .btn { cursor:pointer; border:none; font-family:'Archivo',sans-serif; font-weight:700; transition:transform .12s ease, box-shadow .12s ease; }
+        .disp { font-family:'Inter', sans-serif; font-weight:800; letter-spacing:-0.02em; }
+        .sans { font-family:'Inter', sans-serif; }
+        .btn { cursor:pointer; border:none; font-family:'Inter',sans-serif; font-weight:600; transition:transform .12s ease, box-shadow .12s ease; }
         .btn:active { transform: translateY(1px); }
         .card { background:#fff; border:1px solid ${C.line}; }
-        input, select, textarea { font-family:'Archivo',sans-serif; }
+        input, select, textarea { font-family:'Inter',sans-serif; }
         ::selection { background:${C.amber}; color:#fff; }
       `}</style>
 
       {toast && (
-        <div className="sans" style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: C.ink, color: "#fff", padding: "10px 18px", borderRadius: 3, zIndex: 100, fontSize: 14, fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,.25)" }}>
+        <div className="sans" style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: C.ink, color: "#fff", padding: "10px 18px", borderRadius: 8, zIndex: 100, fontSize: 14, fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,.25)" }}>
           {toast}
         </div>
       )}
 
-      <Header me={me} onLogout={async () => { await clearMe(); setView({ name: "home" }); flash("Déconnecté"); }} onNav={setView} />
+      <Header me={me} onLogout={async () => { await clearMe(); setView({ name: "home" }); flash("Déconnecté"); }} onNav={setView} q={view.name === "home" ? q : undefined} setQ={setQ} />
 
       <main style={{ maxWidth: 980, margin: "0 auto", padding: "0 20px 80px" }}>
-        {view.name === "home" && <Home users={users} categories={categories} loading={loading} onNav={setView} onSuggest={async (text) => { await addSuggestion(text); flash("Merci ! Votre suggestion a été transmise."); }} />}
+        {view.name === "home" && <Home users={users} categories={categories} loading={loading} onNav={setView} q={q} onSuggest={async (text) => { await addSuggestion(text); flash("Merci ! Votre suggestion a été transmise."); }} />}
         {view.name === "category" && <CategoryList category={view.category} users={users} categories={categories} onNav={setView} />}
         {view.name === "profile" && (
           <Profile
@@ -386,33 +386,45 @@ export default function App() {
   );
 }
 
-function Header({ me, onLogout, onNav }) {
+function Header({ me, onLogout, onNav, q, setQ, onSearch }) {
   return (
-    <header style={{ background: C.ink, color: C.paper }}>
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => onNav({ name: "home" })}>
-          <div style={{ width: 34, height: 34, background: C.amber, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3 }}>
-            <Wrench size={18} color={C.ink} />
+    <header style={{ background: "#fff", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, zIndex: 20 }}>
+      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "12px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0 }} onClick={() => onNav({ name: "home" })}>
+          <div style={{ width: 32, height: 32, background: C.amber, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6 }}>
+            <Wrench size={17} color="#fff" />
           </div>
-          <span className="disp" style={{ fontSize: 20 }}>ARTISANS&nbsp;+</span>
+          <span className="disp" style={{ fontSize: 19, color: C.ink }}>Artisans<span style={{ color: C.amber }}>+</span></span>
         </div>
-        <nav className="sans" style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 14 }}>
+
+        {typeof q === "string" && (
+          <div className="sans" style={{ position: "relative", flex: "1 1 260px", minWidth: 180, order: 3, marginTop: 8 }}>
+            <Search size={16} color="#8A909B" style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onSearch?.()}
+              placeholder="Rechercher un service, une ville…"
+              style={{ ...inputStyle, width: "100%", padding: "10px 14px 10px 38px", fontSize: 14, borderRadius: 20, background: C.paper, border: `1px solid ${C.line}` }}
+            />
+          </div>
+        )}
+
+        <nav className="sans" style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 14, marginLeft: "auto" }}>
           {me ? (
             <>
-              <span style={{ opacity: 0.8 }}>Bonjour, {me.name.split(" ")[0]}</span>
-              <button className="btn" onClick={() => onNav({ name: "profile", id: me.id })} style={{ background: "transparent", color: C.paper, textDecoration: "underline", padding: 0 }}>Mon profil</button>
-              <button className="btn" onClick={onLogout} style={{ background: "transparent", color: C.paper, display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
-                <LogOut size={15} /> Quitter
+              <span style={{ color: "#5A6270", display: "none" }}>Bonjour, {me.name.split(" ")[0]}</span>
+              <button className="btn" onClick={() => onNav({ name: "profile", id: me.id })} style={{ background: "transparent", color: C.ink, padding: 0, fontWeight: 600 }}>Mon profil</button>
+              <button className="btn" onClick={onLogout} style={{ background: "transparent", color: "#5A6270", display: "flex", alignItems: "center", gap: 4, padding: 0 }}>
+                <LogOut size={15} /> <span style={{ display: "none" }}>Quitter</span>
               </button>
             </>
           ) : (
-            <>
-              <button className="btn" onClick={() => onNav({ name: "login" })} style={{ background: "transparent", color: C.paper, padding: 0 }}>Connexion</button>
-              <button className="btn" onClick={() => onNav({ name: "signup" })} style={{ background: C.amber, color: "#fff", padding: "9px 16px", borderRadius: 3 }}>
-                Proposer un service
-              </button>
-            </>
+            <button className="btn" onClick={() => onNav({ name: "login" })} style={{ background: "transparent", color: C.ink, padding: 0, fontWeight: 600 }}>Connexion</button>
           )}
+          <button className="btn" onClick={() => onNav({ name: "signup" })} style={{ background: C.amber, color: "#fff", padding: "10px 18px", borderRadius: 20, fontWeight: 700, whiteSpace: "nowrap" }}>
+            + Publier
+          </button>
         </nav>
       </div>
     </header>
@@ -421,14 +433,14 @@ function Header({ me, onLogout, onNav }) {
 
 function Footer({ onNav }) {
   return (
-    <footer className="sans" style={{ borderTop: `1px solid ${C.line}`, marginTop: 60, padding: "22px 20px", textAlign: "center", fontSize: 12, color: "#8a8272" }}>
+    <footer className="sans" style={{ borderTop: `1px solid ${C.line}`, marginTop: 60, padding: "22px 20px", textAlign: "center", fontSize: 12, color: "#8A909B", background: "#fff" }}>
       <span>Répertoire local de prestataires — profils vérifiés avant publication.</span>
       <span style={{ margin: "0 10px" }}>·</span>
-      <button className="btn" onClick={() => onNav({ name: "admin" })} style={{ background: "transparent", color: "#8a8272", textDecoration: "underline", padding: 0, fontSize: 12 }}>
+      <button className="btn" onClick={() => onNav({ name: "admin" })} style={{ background: "transparent", color: "#8A909B", textDecoration: "underline", padding: 0, fontSize: 12 }}>
         Espace validation
       </button>
       <span style={{ margin: "0 10px" }}>·</span>
-      <button className="btn" onClick={() => onNav({ name: "legal" })} style={{ background: "transparent", color: "#8a8272", textDecoration: "underline", padding: 0, fontSize: 12 }}>
+      <button className="btn" onClick={() => onNav({ name: "legal" })} style={{ background: "transparent", color: "#8A909B", textDecoration: "underline", padding: 0, fontSize: 12 }}>
         Mentions légales
       </button>
     </footer>
@@ -440,7 +452,7 @@ function Legal({ onNav }) {
     <section style={{ padding: "30px 0", maxWidth: 640 }}>
       <BackBtn onNav={onNav} label="Retour" />
       <h2 className="disp" style={{ fontSize: 26, margin: "14px 0 18px" }}>Mentions légales</h2>
-      <div className="sans" style={{ fontSize: 14, lineHeight: 1.8, color: "#3a352a" }}>
+      <div className="sans" style={{ fontSize: 14, lineHeight: 1.8, color: "#20232A" }}>
         <p><b>À personnaliser avant mise en ligne.</b> Ce texte est un modèle de départ — remplace les crochets par tes informations réelles (éditeur du site, contact, hébergeur) avant publication.</p>
         <p><b>Éditeur du site :</b> [Ton nom ou celui de ton entreprise] — [ville, pays] — contact : [téléphone / email].</p>
         <p><b>Objet du site :</b> mise en relation entre particuliers/entreprises et prestataires de services locaux. Le site ne réalise pas lui-même les prestations et n'est pas responsable de la qualité des services rendus par les prestataires référencés.</p>
@@ -455,16 +467,11 @@ function Legal({ onNav }) {
 
 function Hero() {
   return (
-    <section style={{ padding: "56px 0 34px", borderBottom: `2px solid ${C.ink}` }}>
-      <div className="sans" style={{ fontSize: 13, fontWeight: 700, color: C.amberDeep, letterSpacing: "0.08em", marginBottom: 10 }}>
-        LE CARNET D'ADRESSES DES BONS ARTISANS
+    <section className="sans" style={{ background: C.amber, padding: "22px 20px", borderRadius: 12, color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", opacity: 0.85, marginBottom: 4 }}>LE CARNET D'ADRESSES DES BONS ARTISANS</div>
+        <div className="disp" style={{ fontSize: 20 }}>Trouvez un prestataire vérifié près de chez vous</div>
       </div>
-      <h1 className="disp" style={{ fontSize: "clamp(32px,6vw,52px)", lineHeight: 1.02, margin: "0 0 14px" }}>
-        Trouvez un électricien, <br /> un plombier, un vendeur —<br /> vérifié, pas au hasard.
-      </h1>
-      <p className="sans" style={{ maxWidth: 520, fontSize: 15, color: "#4a4438", lineHeight: 1.6 }}>
-        Chaque prestataire passe une validation avant publication. Contactez-le directement par téléphone, WhatsApp ou message.
-      </p>
     </section>
   );
 }
@@ -478,60 +485,47 @@ function sortListings(list) {
   });
 }
 
-function Home({ users, categories, loading, onNav, onSuggest }) {
-  const [q, setQ] = useState("");
+function Home({ users, categories, loading, onNav, onSuggest, q }) {
   const approved = sortListings(users.filter((u) => u.status === "approved"));
-  const query = q.trim().toLowerCase();
+  const query = (q || "").trim().toLowerCase();
   const results = query
     ? approved.filter((u) => u.name?.toLowerCase().includes(query) || u.city?.toLowerCase().includes(query) || u.description?.toLowerCase().includes(query))
-    : approved.slice(0, 6);
+    : approved.slice(0, 8);
 
   return (
     <div>
       <Hero />
 
-      <section style={{ padding: "10px 0 0" }}>
-        <div className="sans" style={{ position: "relative" }}>
-          <Search size={16} color="#8a8272" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Rechercher par ville ou par nom…"
-            style={{ ...inputStyle, width: "100%", padding: "13px 14px 13px 40px", fontSize: 14 }}
-          />
+      <section style={{ padding: "28px 0 8px" }}>
+        <div className="sans" style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: C.ink, marginBottom: 14 }}>
+          Catégories
         </div>
-      </section>
-
-      <section style={{ padding: "36px 0 10px" }}>
-        <div className="sans" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#8a8272", marginBottom: 14 }}>
-          CATÉGORIES
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12 }}>
+        <div style={{ display: "flex", gap: 22, overflowX: "auto", paddingBottom: 6 }}>
           {categories.map((c) => {
             const Icon = iconFor(c.icon);
-            const count = approved.filter((u) => u.category === c.id).length;
             return (
-              <button key={c.id} className="btn card" onClick={() => onNav({ name: "category", category: c.id })}
-                style={{ padding: "20px 16px", textAlign: "left", borderRadius: 4 }}>
-                <Icon size={22} color={C.amberDeep} />
-                <div className="disp" style={{ fontSize: 16, marginTop: 10 }}>{c.label}</div>
-                <div className="sans" style={{ fontSize: 12, color: "#8a8272", marginTop: 4 }}>{count} prestataire{count !== 1 ? "s" : ""}</div>
+              <button key={c.id} className="btn" onClick={() => onNav({ name: "category", category: c.id })}
+                style={{ background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0, width: 78 }}>
+                <div style={{ width: 58, height: 58, borderRadius: "50%", background: C.paperDeep, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon size={24} color={C.amberDeep} />
+                </div>
+                <span className="sans" style={{ fontSize: 12, color: C.ink, fontWeight: 600, textAlign: "center", lineHeight: 1.2 }}>{c.label}</span>
               </button>
             );
           })}
         </div>
       </section>
 
-      <section style={{ padding: "40px 0" }}>
-        <div className="sans" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#8a8272", marginBottom: 14 }}>
-          {query ? `RÉSULTATS POUR « ${q.trim()} »` : "RÉCEMMENT VALIDÉS"}
+      <section style={{ padding: "26px 0" }}>
+        <div className="sans" style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 14 }}>
+          {query ? `Résultats pour « ${q.trim()} »` : "Annonces récentes"}
         </div>
         {loading ? (
-          <p className="sans" style={{ color: "#8a8272" }}>Chargement…</p>
+          <p className="sans" style={{ color: "#8A909B" }}>Chargement…</p>
         ) : results.length === 0 ? (
-          query ? <p className="sans" style={{ color: "#8a8272" }}>Aucun résultat pour cette recherche.</p> : <EmptyState onNav={onNav} />
+          query ? <p className="sans" style={{ color: "#8A909B" }}>Aucun résultat pour cette recherche.</p> : <EmptyState onNav={onNav} />
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px,1fr))", gap: 14 }}>
             {results.map((u) => (
               <UserCard key={u.id} u={u} categories={categories} onNav={onNav} />
             ))}
@@ -561,12 +555,12 @@ function SuggestionBox({ onSuggest }) {
 
   return (
     <section style={{ padding: "10px 0 40px" }}>
-      <div className="card" style={{ borderRadius: 4, padding: 20, borderLeft: `4px solid ${C.amber}` }}>
+      <div className="card" style={{ borderRadius: 10, padding: 20, borderLeft: `4px solid ${C.amber}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <Lightbulb size={18} color={C.amberDeep} />
           <span className="disp" style={{ fontSize: 16 }}>Un service manque au carnet ?</span>
         </div>
-        <p className="sans" style={{ fontSize: 13, color: "#6b6353", margin: "0 0 12px" }}>
+        <p className="sans" style={{ fontSize: 13, color: "#5A6270", margin: "0 0 12px" }}>
           Dites-nous quel type de prestataire vous aimeriez trouver ici — on étudie chaque suggestion.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -577,7 +571,7 @@ function SuggestionBox({ onSuggest }) {
             placeholder="Ex. : peintre en bâtiment, menuisier, coiffeuse à domicile…"
             style={{ ...inputStyle, flex: "1 1 260px" }}
           />
-          <button className="btn" onClick={submit} disabled={sending} style={{ background: C.ink, color: "#fff", padding: "0 18px", borderRadius: 3 }}>
+          <button className="btn" onClick={submit} disabled={sending} style={{ background: C.ink, color: "#fff", padding: "0 18px", borderRadius: 8 }}>
             Envoyer
           </button>
         </div>
@@ -589,9 +583,9 @@ function SuggestionBox({ onSuggest }) {
 
 function EmptyState({ onNav }) {
   return (
-    <div className="sans card" style={{ padding: 28, borderRadius: 4, textAlign: "center", color: "#6b6353" }}>
+    <div className="sans card" style={{ padding: 28, borderRadius: 10, textAlign: "center", color: "#5A6270" }}>
       <p style={{ margin: "0 0 14px" }}>Aucun profil validé pour l'instant. Soyez le premier prestataire du carnet.</p>
-      <button className="btn" onClick={() => onNav({ name: "signup" })} style={{ background: C.amber, color: "#fff", padding: "10px 18px", borderRadius: 3 }}>
+      <button className="btn" onClick={() => onNav({ name: "signup" })} style={{ background: C.amber, color: "#fff", padding: "10px 18px", borderRadius: 8 }}>
         Proposer un service
       </button>
     </div>
@@ -603,7 +597,7 @@ function Stars({ rating = 0, size = 13, count }) {
   return (
     <span className="sans" style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: size }}>
       <span style={{ color: C.amber, letterSpacing: 1 }}>{"★".repeat(full)}{"☆".repeat(5 - full)}</span>
-      {typeof count === "number" && <span style={{ color: "#8a8272", fontSize: size - 1 }}>({count})</span>}
+      {typeof count === "number" && <span style={{ color: "#8A909B", fontSize: size - 1 }}>({count})</span>}
     </span>
   );
 }
@@ -611,26 +605,30 @@ function Stars({ rating = 0, size = 13, count }) {
 function UserCard({ u, categories, onNav }) {
   const cat = categories.find((c) => c.id === u.category);
   return (
-    <button className="btn card" onClick={() => onNav({ name: "profile", id: u.id })} style={{ textAlign: "left", padding: 16, borderRadius: 4, position: "relative", border: isBoostActive(u) ? `1px solid ${C.amber}` : `1px solid ${C.line}`, boxShadow: isBoostActive(u) ? `0 0 0 1px ${C.amber}` : "none" }}>
-      {isBoostActive(u) && (
-        <span className="sans" style={{ position: "absolute", top: -9, right: 12, background: C.amber, color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 4 }}>
-          <Rocket size={10} /> EN AVANT
-        </span>
-      )}
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <Avatar photo={u.photo} name={u.name} size={44} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div className="disp" style={{ fontSize: 16 }}>{u.name}</div>
-            <ShieldCheck size={16} color={C.stamp} />
+    <button className="btn card" onClick={() => onNav({ name: "profile", id: u.id })} style={{ textAlign: "left", padding: 0, borderRadius: 10, overflow: "hidden", position: "relative", boxShadow: isBoostActive(u) ? `0 0 0 2px ${C.amber}` : "0 1px 2px rgba(0,0,0,.04)" }}>
+      <div style={{ position: "relative", aspectRatio: "4/3", background: C.paperDeep }}>
+        {u.photo ? (
+          <img src={u.photo} alt={u.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : (
+          <div className="disp" style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.amberDeep, fontSize: 32 }}>
+            {(u.name || "?").trim().charAt(0).toUpperCase()}
           </div>
-          <div className="sans" style={{ fontSize: 12, color: C.amberDeep, fontWeight: 700, marginTop: 4 }}>{cat?.label} · {u.city}</div>
-          {u.ratingCount > 0 && <div style={{ marginTop: 4 }}><Stars rating={u.avgRating} count={u.ratingCount} /></div>}
-        </div>
+        )}
+        {isBoostActive(u) && (
+          <span className="sans" style={{ position: "absolute", top: 8, left: 8, background: C.amber, color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, display: "flex", alignItems: "center", gap: 4 }}>
+            <Rocket size={10} /> EN AVANT
+          </span>
+        )}
+        <span style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,.92)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ShieldCheck size={14} color={C.stamp} />
+        </span>
       </div>
-      <p className="sans" style={{ fontSize: 13, color: "#5c5546", marginTop: 10, lineHeight: 1.5 }}>
-        {u.description?.slice(0, 90)}{u.description?.length > 90 ? "…" : ""}
-      </p>
+      <div style={{ padding: "10px 12px 12px" }}>
+        <div className="sans" style={{ fontSize: 14, fontWeight: 700, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</div>
+        <div className="sans" style={{ fontSize: 12, color: C.amberDeep, fontWeight: 600, marginTop: 3 }}>{cat?.label}</div>
+        <div className="sans" style={{ fontSize: 12, color: "#8A909B", marginTop: 2 }}>{u.city}</div>
+        {u.ratingCount > 0 && <div style={{ marginTop: 5 }}><Stars rating={u.avgRating} count={u.ratingCount} /></div>}
+      </div>
     </button>
   );
 }
@@ -658,11 +656,11 @@ function CategoryList({ category, users, categories, onNav }) {
       <BackBtn onNav={onNav} label="Toutes les catégories" />
       <h2 className="disp" style={{ fontSize: 28, margin: "14px 0 16px" }}>{cat?.label}</h2>
       <div className="sans" style={{ position: "relative", marginBottom: 20 }}>
-        <Search size={16} color="#8a8272" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
+        <Search size={16} color="#8A909B" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrer par ville ou par nom…" style={{ ...inputStyle, width: "100%", padding: "13px 14px 13px 40px", fontSize: 14 }} />
       </div>
       {list.length === 0 ? (
-        query ? <p className="sans" style={{ color: "#8a8272" }}>Aucun résultat pour cette recherche.</p> : <EmptyState onNav={onNav} />
+        query ? <p className="sans" style={{ color: "#8A909B" }}>Aucun résultat pour cette recherche.</p> : <EmptyState onNav={onNav} />
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px,1fr))", gap: 14 }}>
           {list.map((u) => <UserCard key={u.id} u={u} categories={categories} onNav={onNav} />)}
@@ -674,7 +672,7 @@ function CategoryList({ category, users, categories, onNav }) {
 
 function BackBtn({ onNav, label }) {
   return (
-    <button className="btn sans" onClick={() => onNav({ name: "home" })} style={{ background: "transparent", color: "#6b6353", display: "flex", alignItems: "center", gap: 4, padding: 0, fontSize: 13 }}>
+    <button className="btn sans" onClick={() => onNav({ name: "home" })} style={{ background: "transparent", color: "#5A6270", display: "flex", alignItems: "center", gap: 4, padding: 0, fontSize: 13 }}>
       <ChevronLeft size={15} /> {label}
     </button>
   );
@@ -688,7 +686,7 @@ function StatusBadge({ status }) {
   };
   const s = map[status] || map.pending;
   return (
-    <span className="sans" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: s.color, background: s.bg, padding: "5px 10px", borderRadius: 3 }}>
+    <span className="sans" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: s.color, background: s.bg, padding: "5px 10px", borderRadius: 8 }}>
       {status === "approved" ? <ShieldCheck size={13} /> : <Clock size={13} />} {s.label}
     </span>
   );
@@ -708,7 +706,7 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
   const loadThread = useCallback(async () => {
     if (!convoKey) return;
     try {
-      const r = await storage.get(convoKey, true);
+      const r = await window.storage.get(convoKey, true);
       setThread(r?.value ? JSON.parse(r.value) : []);
     } catch (e) {
       setThread([]);
@@ -718,7 +716,7 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
   const loadReviews = useCallback(async () => {
     if (!reviewsKey) return;
     try {
-      const r = await storage.get(reviewsKey, true);
+      const r = await window.storage.get(reviewsKey, true);
       setReviews(r?.value ? JSON.parse(r.value) : []);
     } catch (e) {
       setReviews([]);
@@ -759,7 +757,7 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
     setSending(true);
     const next = [...thread, { from: me.id, fromName: me.name, text: msg.trim(), at: Date.now() }];
     try {
-      await storage.set(convoKey, JSON.stringify(next), true);
+      await window.storage.set(convoKey, JSON.stringify(next), true);
       setThread(next);
       setMsg("");
     } catch (e) {
@@ -771,7 +769,7 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
   const submitReview = async (rating, comment) => {
     const review = { id: uid(), author: me.name, rating, comment: comment.trim(), at: Date.now() };
     const next = [...reviews, review];
-    await storage.set(reviewsKey, JSON.stringify(next), true);
+    await window.storage.set(reviewsKey, JSON.stringify(next), true);
     setReviews(next);
     const avg = next.reduce((s, r) => s + r.rating, 0) / next.length;
     await onUpdateRating(user, Math.round(avg * 10) / 10, next.length);
@@ -799,11 +797,11 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
           <StatusBadge status={user.status} />
           {isOwner ? (
-            <button className="btn sans" onClick={() => setEditing(true)} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#6b6353", padding: "6px 12px", borderRadius: 3, fontSize: 12 }}>
+            <button className="btn sans" onClick={() => setEditing(true)} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#5A6270", padding: "6px 12px", borderRadius: 8, fontSize: 12 }}>
               Modifier mon profil
             </button>
           ) : (
-            <button className="btn sans" onClick={() => setReporting(true)} style={{ background: "transparent", color: "#a89f8c", padding: 0, fontSize: 11, textDecoration: "underline" }}>
+            <button className="btn sans" onClick={() => setReporting(true)} style={{ background: "transparent", color: "#9AA0AA", padding: 0, fontSize: 11, textDecoration: "underline" }}>
               Signaler ce profil
             </button>
           )}
@@ -821,22 +819,22 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
       )}
 
       {user.status === "pending" && isOwner && (
-        <div className="sans card" style={{ padding: 14, borderRadius: 4, marginTop: 18, fontSize: 13, color: "#6b6353", borderLeft: `4px solid ${C.amber}` }}>
+        <div className="sans card" style={{ padding: 14, borderRadius: 10, marginTop: 18, fontSize: 13, color: "#5A6270", borderLeft: `4px solid ${C.amber}` }}>
           Votre profil est en attente de validation. Il apparaîtra publiquement une fois vérifié.
         </div>
       )}
       {user.status === "rejected" && isOwner && (
-        <div className="sans card" style={{ padding: 14, borderRadius: 4, marginTop: 18, fontSize: 13, color: "#6b6353", borderLeft: `4px solid ${C.rust}` }}>
+        <div className="sans card" style={{ padding: 14, borderRadius: 10, marginTop: 18, fontSize: 13, color: "#5A6270", borderLeft: `4px solid ${C.rust}` }}>
           Ce profil a été refusé. Contactez l'équipe pour en savoir plus.
         </div>
       )}
 
-      <p className="sans" style={{ marginTop: 20, lineHeight: 1.7, color: "#3a352a", fontSize: 15 }}>{user.description}</p>
+      <p className="sans" style={{ marginTop: 20, lineHeight: 1.7, color: "#20232A", fontSize: 15 }}>{user.description}</p>
 
       {user.gallery?.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px,1fr))", gap: 8, marginTop: 16 }}>
           {user.gallery.map((src, i) => (
-            <img key={i} src={src} alt={`Réalisation ${i + 1}`} style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 4, border: `1px solid ${C.line}` }} />
+            <img key={i} src={src} alt={`Réalisation ${i + 1}`} style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.line}` }} />
           ))}
         </div>
       )}
@@ -847,10 +845,10 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
 
       {!isOwner && user.status === "approved" && (
         <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
-          <a href={`tel:${user.phone}`} className="btn sans" style={{ background: C.ink, color: "#fff", padding: "11px 18px", borderRadius: 3, display: "flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
+          <a href={`tel:${user.phone}`} className="btn sans" style={{ background: C.ink, color: "#fff", padding: "11px 18px", borderRadius: 8, display: "flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
             <Phone size={15} /> Appeler
           </a>
-          <a href={`https://wa.me/${user.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn sans" style={{ background: C.stamp, color: "#fff", padding: "11px 18px", borderRadius: 3, display: "flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
+          <a href={`https://wa.me/${user.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="btn sans" style={{ background: C.stamp, color: "#fff", padding: "11px 18px", borderRadius: 8, display: "flex", alignItems: "center", gap: 7, textDecoration: "none" }}>
             <MessageCircle size={15} /> WhatsApp
           </a>
         </div>
@@ -858,17 +856,17 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
 
       {!isOwner && user.status === "approved" && (
         <div style={{ marginTop: 30 }}>
-          <div className="sans" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#8a8272", marginBottom: 10 }}>
+          <div className="sans" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#8A909B", marginBottom: 10 }}>
             MESSAGERIE
           </div>
           {!me ? (
-            <p className="sans" style={{ fontSize: 13, color: "#6b6353" }}>
+            <p className="sans" style={{ fontSize: 13, color: "#5A6270" }}>
               <button className="btn" onClick={() => onNav({ name: "login" })} style={{ background: "transparent", color: C.amberDeep, textDecoration: "underline", padding: 0 }}>Connectez-vous</button> pour envoyer un message.
             </p>
           ) : (
-            <div className="card" style={{ borderRadius: 4, padding: 14 }}>
+            <div className="card" style={{ borderRadius: 10, padding: 14 }}>
               <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                {thread.length === 0 && <p className="sans" style={{ fontSize: 13, color: "#8a8272", margin: 0 }}>Aucun message encore.</p>}
+                {thread.length === 0 && <p className="sans" style={{ fontSize: 13, color: "#8A909B", margin: 0 }}>Aucun message encore.</p>}
                 {thread.map((m, i) => (
                   <div key={i} className="sans" style={{ alignSelf: m.from === me.id ? "flex-end" : "flex-start", background: m.from === me.id ? C.amber : C.paperDeep, color: m.from === me.id ? "#fff" : C.ink, padding: "8px 12px", borderRadius: 10, fontSize: 13, maxWidth: "80%" }}>
                     {m.text}
@@ -876,8 +874,8 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
                 ))}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Votre message…" style={{ flex: 1, padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 3, fontSize: 13 }} />
-                <button className="btn" onClick={send} disabled={sending} style={{ background: C.ink, color: "#fff", padding: "0 16px", borderRadius: 3 }}>Envoyer</button>
+                <input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Votre message…" style={{ flex: 1, padding: "10px 12px", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 13 }} />
+                <button className="btn" onClick={send} disabled={sending} style={{ background: C.ink, color: "#fff", padding: "0 16px", borderRadius: 8 }}>Envoyer</button>
               </div>
             </div>
           )}
@@ -894,12 +892,12 @@ function Profile({ user, me, categories, onNav, flash, onRequestBoost, onCancelB
 function ReportBox({ onCancel, onSubmit }) {
   const [reason, setReason] = useState("");
   return (
-    <div className="card sans" style={{ marginTop: 14, padding: 14, borderRadius: 4, borderLeft: `4px solid ${C.rust}` }}>
+    <div className="card sans" style={{ marginTop: 14, padding: 14, borderRadius: 10, borderLeft: `4px solid ${C.rust}` }}>
       <div className="disp" style={{ fontSize: 14, marginBottom: 8 }}>Signaler ce profil</div>
       <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Expliquez brièvement le problème…" style={{ ...inputStyle, width: "100%", resize: "vertical" }} />
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-        <button className="btn" onClick={() => reason.trim() && onSubmit(reason.trim())} style={{ background: C.rust, color: "#fff", padding: "8px 14px", borderRadius: 3, fontSize: 12 }}>Envoyer le signalement</button>
-        <button className="btn" onClick={onCancel} style={{ background: "transparent", color: "#8a8272", padding: "8px 6px", fontSize: 12 }}>Annuler</button>
+        <button className="btn" onClick={() => reason.trim() && onSubmit(reason.trim())} style={{ background: C.rust, color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 12 }}>Envoyer le signalement</button>
+        <button className="btn" onClick={onCancel} style={{ background: "transparent", color: "#8A909B", padding: "8px 6px", fontSize: 12 }}>Annuler</button>
       </div>
     </div>
   );
@@ -913,41 +911,41 @@ function ReviewsSection({ reviews, me, isOwner, onSubmit, onLogin }) {
 
   return (
     <div style={{ marginTop: 34 }}>
-      <div className="sans" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#8a8272", marginBottom: 10 }}>
+      <div className="sans" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "#8A909B", marginBottom: 10 }}>
         AVIS {reviews.length > 0 ? `(${reviews.length})` : ""}
       </div>
 
       {!isOwner && me && !already && (
-        <div className="card" style={{ padding: 14, borderRadius: 4, marginBottom: 16 }}>
+        <div className="card" style={{ padding: 14, borderRadius: 10, marginBottom: 16 }}>
           <div className="sans" style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Laisser un avis</div>
           <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
             {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} className="btn" onClick={() => setRating(n)} style={{ background: "transparent", padding: 0, fontSize: 22, color: n <= rating ? C.amber : "#d8d2c2" }}>★</button>
+              <button key={n} className="btn" onClick={() => setRating(n)} style={{ background: "transparent", padding: 0, fontSize: 22, color: n <= rating ? C.amber : "#D8DAE0" }}>★</button>
             ))}
           </div>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder="Votre expérience avec ce prestataire…" style={{ ...inputStyle, width: "100%", resize: "vertical", fontSize: 13 }} />
-          <button className="btn sans" onClick={() => { onSubmit(rating, comment); setComment(""); setRating(5); }} style={{ background: C.ink, color: "#fff", padding: "8px 16px", borderRadius: 3, marginTop: 8, fontSize: 12 }}>
+          <button className="btn sans" onClick={() => { onSubmit(rating, comment); setComment(""); setRating(5); }} style={{ background: C.ink, color: "#fff", padding: "8px 16px", borderRadius: 8, marginTop: 8, fontSize: 12 }}>
             Publier l'avis
           </button>
         </div>
       )}
       {!isOwner && !me && (
-        <p className="sans" style={{ fontSize: 13, color: "#6b6353", marginBottom: 16 }}>
+        <p className="sans" style={{ fontSize: 13, color: "#5A6270", marginBottom: 16 }}>
           <button className="btn" onClick={onLogin} style={{ background: "transparent", color: C.amberDeep, textDecoration: "underline", padding: 0 }}>Connectez-vous</button> pour laisser un avis.
         </p>
       )}
 
       {sorted.length === 0 ? (
-        <p className="sans" style={{ fontSize: 13, color: "#8a8272" }}>Aucun avis pour l'instant.</p>
+        <p className="sans" style={{ fontSize: 13, color: "#8A909B" }}>Aucun avis pour l'instant.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sorted.map((r) => (
-            <div key={r.id} className="card sans" style={{ padding: 12, borderRadius: 4 }}>
+            <div key={r.id} className="card sans" style={{ padding: 12, borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{r.author}</span>
                 <Stars rating={r.rating} />
               </div>
-              {r.comment && <p style={{ fontSize: 13, color: "#5c5546", margin: "6px 0 0" }}>{r.comment}</p>}
+              {r.comment && <p style={{ fontSize: 13, color: "#454B54", margin: "6px 0 0" }}>{r.comment}</p>}
             </div>
           ))}
         </div>
@@ -1004,7 +1002,7 @@ function EditProfileForm({ user, categories, onSave, onCancel }) {
 
   return (
     <section style={{ padding: "30px 0", maxWidth: 520 }}>
-      <button className="btn sans" onClick={onCancel} style={{ background: "transparent", color: "#6b6353", display: "flex", alignItems: "center", gap: 4, padding: 0, fontSize: 13 }}>
+      <button className="btn sans" onClick={onCancel} style={{ background: "transparent", color: "#5A6270", display: "flex", alignItems: "center", gap: 4, padding: 0, fontSize: 13 }}>
         <ChevronLeft size={15} /> Annuler
       </button>
       <h2 className="disp" style={{ fontSize: 26, margin: "14px 0 20px" }}>Modifier mon profil</h2>
@@ -1012,7 +1010,7 @@ function EditProfileForm({ user, categories, onSave, onCancel }) {
         <Field label="Photo de profil">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Avatar photo={form.photo} name={form.name} size={56} />
-            <label className="btn sans" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.ink, padding: "9px 14px", borderRadius: 3, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
+            <label className="btn sans" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.ink, padding: "9px 14px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
               <Camera size={15} /> {uploading ? "Chargement…" : "Changer la photo"}
               <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
             </label>
@@ -1033,7 +1031,7 @@ function EditProfileForm({ user, categories, onSave, onCancel }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px,1fr))", gap: 8, marginBottom: 8 }}>
             {form.gallery.map((src, i) => (
               <div key={i} style={{ position: "relative" }}>
-                <img src={src} alt="" style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 3, border: `1px solid ${C.line}` }} />
+                <img src={src} alt="" style={{ width: "100%", height: 70, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }} />
                 <button className="btn" onClick={() => removeGalleryPhoto(i)} style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.rust, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
                   <X size={12} />
                 </button>
@@ -1041,14 +1039,14 @@ function EditProfileForm({ user, categories, onSave, onCancel }) {
             ))}
           </div>
           {form.gallery.length < 6 && (
-            <label className="btn sans" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.ink, padding: "9px 14px", borderRadius: 3, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
+            <label className="btn sans" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.ink, padding: "9px 14px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
               <Camera size={15} /> Ajouter des photos
               <input type="file" accept="image/*" multiple onChange={handleGalleryAdd} style={{ display: "none" }} />
             </label>
           )}
         </Field>
         {err && <p className="sans" style={{ color: C.rust, fontSize: 13, margin: 0 }}>{err}</p>}
-        <button className="btn" onClick={submit} style={{ background: C.amber, color: "#fff", padding: "13px 18px", borderRadius: 3, marginTop: 6 }}>
+        <button className="btn" onClick={submit} style={{ background: C.amber, color: "#fff", padding: "13px 18px", borderRadius: 8, marginTop: 6 }}>
           Enregistrer les modifications
         </button>
       </div>
@@ -1074,18 +1072,18 @@ function BoostPanel({ user, onRequestBoost, onCancelBoostRequest, flash }) {
   // Une demande de paiement est en attente de confirmation par l'admin.
   if (req) {
     return (
-      <div className="card" style={{ marginTop: 20, padding: 18, borderRadius: 4, borderLeft: `4px solid ${C.amber}` }}>
+      <div className="card" style={{ marginTop: 20, padding: 18, borderRadius: 10, borderLeft: `4px solid ${C.amber}` }}>
         <div className="disp" style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
           <Rocket size={15} color={C.amberDeep} /> Paiement en attente de confirmation
         </div>
-        <p className="sans" style={{ fontSize: 13, color: "#3a352a", lineHeight: 1.7, margin: 0 }}>
+        <p className="sans" style={{ fontSize: 13, color: "#20232A", lineHeight: 1.7, margin: 0 }}>
           Envoyez <b>{fcfa(req.amount)}</b> par Mobile Money (MTN/Moov) au numéro <b>{MOMO_NUMBER}</b>, en indiquant la référence <b>{req.reference}</b>. Votre annonce passera en avant dès que le transfert sera vérifié.
         </p>
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <button className="btn sans" onClick={copyNumber} style={{ background: C.ink, color: "#fff", padding: "8px 14px", borderRadius: 3, fontSize: 12 }}>
+          <button className="btn sans" onClick={copyNumber} style={{ background: C.ink, color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 12 }}>
             {copied ? "Numéro copié ✓" : "Copier le numéro"}
           </button>
-          <button className="btn sans" onClick={() => onCancelBoostRequest(user)} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#6b6353", padding: "8px 14px", borderRadius: 3, fontSize: 12 }}>
+          <button className="btn sans" onClick={() => onCancelBoostRequest(user)} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#5A6270", padding: "8px 14px", borderRadius: 8, fontSize: 12 }}>
             Annuler la demande
           </button>
         </div>
@@ -1094,20 +1092,20 @@ function BoostPanel({ user, onRequestBoost, onCancelBoostRequest, flash }) {
   }
 
   return (
-    <div className="card" style={{ marginTop: 20, padding: 18, borderRadius: 4, borderLeft: `4px solid ${C.amber}` }}>
+    <div className="card" style={{ marginTop: 20, padding: 18, borderRadius: 10, borderLeft: `4px solid ${C.amber}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div>
           <div className="disp" style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
             <Rocket size={15} color={C.amberDeep} /> Mise en avant
           </div>
-          <p className="sans" style={{ fontSize: 12, color: "#6b6353", margin: "4px 0 0" }}>
+          <p className="sans" style={{ fontSize: 12, color: "#5A6270", margin: "4px 0 0" }}>
             {active
               ? `Active — s'affiche en premier dans sa catégorie${remaining != null ? ` (encore ${remaining} jour${remaining !== 1 ? "s" : ""})` : ""}.`
               : "Passez en tête des résultats de votre catégorie et de l'accueil, par transfert Mobile Money."}
           </p>
         </div>
         {!active && (
-          <button className="btn sans" onClick={() => setPicking((v) => !v)} style={{ background: C.amber, color: "#fff", padding: "10px 16px", borderRadius: 3, display: "flex", alignItems: "center", gap: 6 }}>
+          <button className="btn sans" onClick={() => setPicking((v) => !v)} style={{ background: C.amber, color: "#fff", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 6 }}>
             <Rocket size={14} /> Booster mon annonce
           </button>
         )}
@@ -1124,7 +1122,7 @@ function BoostPanel({ user, onRequestBoost, onCancelBoostRequest, flash }) {
                 flash(`Instructions de paiement générées — réf. ${ref || ""}`);
                 setPicking(false);
               }}
-              style={{ flex: "1 1 160px", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 4, padding: "14px 16px", textAlign: "left" }}
+              style={{ flex: "1 1 160px", background: "#fff", border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 16px", textAlign: "left" }}
             >
               <div className="disp" style={{ fontSize: 18 }}>{o.days} jours</div>
               <div className="sans" style={{ fontSize: 13, color: C.amberDeep, fontWeight: 700, marginTop: 4 }}>{fcfa(o.amount)}</div>
@@ -1172,13 +1170,13 @@ function Signup({ me, categories, onCreated, onNav }) {
     <section style={{ padding: "30px 0", maxWidth: 520 }}>
       <BackBtn onNav={onNav} label="Retour" />
       <h2 className="disp" style={{ fontSize: 28, margin: "14px 0 4px" }}>Proposer un service</h2>
-      <p className="sans" style={{ fontSize: 13, color: "#6b6353", marginBottom: 20 }}>Votre profil sera vérifié avant publication.</p>
+      <p className="sans" style={{ fontSize: 13, color: "#5A6270", marginBottom: 20 }}>Votre profil sera vérifié avant publication.</p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Field label="Photo de profil">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Avatar photo={form.photo} name={form.name} size={56} />
-            <label className="btn sans" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.ink, padding: "9px 14px", borderRadius: 3, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
+            <label className="btn sans" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.ink, padding: "9px 14px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
               <Camera size={15} /> {uploading ? "Chargement…" : form.photo ? "Changer la photo" : "Ajouter une photo"}
               <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
             </label>
@@ -1199,7 +1197,7 @@ function Signup({ me, categories, onCreated, onNav }) {
           <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={inputStyle} />
         </Field>
         {err && <p className="sans" style={{ color: C.rust, fontSize: 13, margin: 0 }}>{err}</p>}
-        <button className="btn" onClick={submit} style={{ background: C.amber, color: "#fff", padding: "13px 18px", borderRadius: 3, marginTop: 6 }}>
+        <button className="btn" onClick={submit} style={{ background: C.amber, color: "#fff", padding: "13px 18px", borderRadius: 8, marginTop: 6 }}>
           Envoyer pour validation
         </button>
       </div>
@@ -1209,14 +1207,14 @@ function Signup({ me, categories, onCreated, onNav }) {
 
 function Field({ label, children }) {
   return (
-    <label className="sans" style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 700, color: "#6b6353", letterSpacing: "0.03em" }}>
+    <label className="sans" style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 700, color: "#5A6270", letterSpacing: "0.03em" }}>
       {label.toUpperCase()}
       {children}
     </label>
   );
 }
 
-const inputStyle = { padding: "11px 12px", border: `1px solid ${C.line}`, borderRadius: 3, fontSize: 14, background: "#fff", color: C.ink };
+const inputStyle = { padding: "11px 12px", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 14, background: "#fff", color: C.ink };
 
 function Login({ users, onLogin, onNav }) {
   const [phone, setPhone] = useState("");
@@ -1240,8 +1238,8 @@ function Login({ users, onLogin, onNav }) {
         <Field label="Téléphone"><input value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} /></Field>
         <Field label="Mot de passe"><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} style={inputStyle} /></Field>
         {err && <p className="sans" style={{ color: C.rust, fontSize: 13, margin: 0 }}>{err}</p>}
-        <button className="btn" onClick={submit} style={{ background: C.ink, color: "#fff", padding: "13px 18px", borderRadius: 3 }}>Se connecter</button>
-        <p className="sans" style={{ fontSize: 13, color: "#6b6353" }}>
+        <button className="btn" onClick={submit} style={{ background: C.ink, color: "#fff", padding: "13px 18px", borderRadius: 8 }}>Se connecter</button>
+        <p className="sans" style={{ fontSize: 13, color: "#5A6270" }}>
           Pas encore de profil ? <button className="btn" onClick={() => onNav({ name: "signup" })} style={{ background: "transparent", color: C.amberDeep, textDecoration: "underline", padding: 0 }}>Proposer un service</button>
         </p>
       </div>
@@ -1266,8 +1264,8 @@ function Admin({ users, categories, suggestions, reports, boostHistory, onDecisi
         <BackBtn onNav={onNav} label="Retour" />
         <h2 className="disp" style={{ fontSize: 24, margin: "14px 0 16px" }}>Espace validation</h2>
         <input type="password" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code d'accès" style={{ ...inputStyle, width: "100%" }} onKeyDown={(e) => e.key === "Enter" && code === "admin2026" && setUnlocked(true)} />
-        <button className="btn" onClick={() => setUnlocked(code === "admin2026")} style={{ background: C.ink, color: "#fff", padding: "11px 16px", borderRadius: 3, marginTop: 10 }}>Entrer</button>
-        <p className="sans" style={{ fontSize: 12, color: "#8a8272", marginTop: 10 }}>Code de démonstration : admin2026 (à personnaliser).</p>
+        <button className="btn" onClick={() => setUnlocked(code === "admin2026")} style={{ background: C.ink, color: "#fff", padding: "11px 16px", borderRadius: 8, marginTop: 10 }}>Entrer</button>
+        <p className="sans" style={{ fontSize: 12, color: "#8A909B", marginTop: 10 }}>Code de démonstration : admin2026 (à personnaliser).</p>
       </section>
     );
   }
@@ -1276,17 +1274,17 @@ function Admin({ users, categories, suggestions, reports, boostHistory, onDecisi
     <section style={{ padding: "30px 0" }}>
       <BackBtn onNav={onNav} label="Retour" />
       <h2 className="disp" style={{ fontSize: 26, margin: "14px 0 20px" }}>À valider ({pending.length})</h2>
-      {pending.length === 0 && <p className="sans" style={{ color: "#8a8272" }}>Rien en attente.</p>}
+      {pending.length === 0 && <p className="sans" style={{ color: "#8A909B" }}>Rien en attente.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {pending.map((u) => (
-          <div key={u.id} className="card" style={{ padding: 14, borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div key={u.id} className="card" style={{ padding: 14, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div>
-              <div className="disp" style={{ fontSize: 15 }}>{u.name} <span className="sans" style={{ fontWeight: 400, color: "#8a8272", fontSize: 12 }}>· {categories.find(c => c.id === u.category)?.label} · {u.city}</span></div>
-              <p className="sans" style={{ fontSize: 12, color: "#6b6353", margin: "4px 0 0", maxWidth: 480 }}>{u.description}</p>
+              <div className="disp" style={{ fontSize: 15 }}>{u.name} <span className="sans" style={{ fontWeight: 400, color: "#8A909B", fontSize: 12 }}>· {categories.find(c => c.id === u.category)?.label} · {u.city}</span></div>
+              <p className="sans" style={{ fontSize: 12, color: "#5A6270", margin: "4px 0 0", maxWidth: 480 }}>{u.description}</p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn" onClick={() => onDecision(u, "approved")} style={{ background: C.stamp, color: "#fff", padding: "8px 14px", borderRadius: 3, display: "flex", alignItems: "center", gap: 5 }}><Check size={14} /> Valider</button>
-              <button className="btn" onClick={() => onDecision(u, "rejected")} style={{ background: C.rust, color: "#fff", padding: "8px 14px", borderRadius: 3, display: "flex", alignItems: "center", gap: 5 }}><X size={14} /> Refuser</button>
+              <button className="btn" onClick={() => onDecision(u, "approved")} style={{ background: C.stamp, color: "#fff", padding: "8px 14px", borderRadius: 8, display: "flex", alignItems: "center", gap: 5 }}><Check size={14} /> Valider</button>
+              <button className="btn" onClick={() => onDecision(u, "rejected")} style={{ background: C.rust, color: "#fff", padding: "8px 14px", borderRadius: 8, display: "flex", alignItems: "center", gap: 5 }}><X size={14} /> Refuser</button>
             </div>
           </div>
         ))}
@@ -1297,13 +1295,13 @@ function Admin({ users, categories, suggestions, reports, boostHistory, onDecisi
           <h3 className="disp" style={{ fontSize: 18, margin: "30px 0 12px" }}>Déjà traités</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {decided.map((u) => (
-            <div key={u.id} className="card" style={{ padding: 14, borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div key={u.id} className="card" style={{ padding: 14, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
               <div>
-                <div className="disp" style={{ fontSize: 15 }}>{u.name} <span className="sans" style={{ fontWeight: 400, color: "#8a8272", fontSize: 12 }}>· {categories.find(c => c.id === u.category)?.label}</span></div>
+                <div className="disp" style={{ fontSize: 15 }}>{u.name} <span className="sans" style={{ fontWeight: 400, color: "#8A909B", fontSize: 12 }}>· {categories.find(c => c.id === u.category)?.label}</span></div>
                 <StatusBadge status={u.status} />
               </div>
               {u.status === "approved" && (
-                <button className="btn sans" onClick={() => onToggleBoost(u)} style={{ background: isBoostActive(u) ? C.amber : "transparent", border: isBoostActive(u) ? "none" : `1px solid ${C.line}`, color: isBoostActive(u) ? "#fff" : "#6b6353", padding: "6px 12px", borderRadius: 3, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                <button className="btn sans" onClick={() => onToggleBoost(u)} style={{ background: isBoostActive(u) ? C.amber : "transparent", border: isBoostActive(u) ? "none" : `1px solid ${C.line}`, color: isBoostActive(u) ? "#fff" : "#5A6270", padding: "6px 12px", borderRadius: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
                   <Rocket size={12} /> {isBoostActive(u) ? "Retirer boost" : "Booster (offert)"}
                 </button>
               )}
@@ -1328,9 +1326,9 @@ function BoostHistoryPanel({ history }) {
   return (
     <div style={{ marginTop: 44 }}>
       <h3 className="disp" style={{ fontSize: 20, margin: "0 0 4px" }}>Historique des paiements ({history.length})</h3>
-      {history.length > 0 && <p className="sans" style={{ fontSize: 12, color: "#8a8272", margin: "0 0 14px" }}>Total encaissé : {fcfa(total)}</p>}
+      {history.length > 0 && <p className="sans" style={{ fontSize: 12, color: "#8A909B", margin: "0 0 14px" }}>Total encaissé : {fcfa(total)}</p>}
       {sorted.length === 0 ? (
-        <p className="sans" style={{ color: "#8a8272", fontSize: 13 }}>Aucune mise en avant confirmée pour l'instant.</p>
+        <p className="sans" style={{ color: "#8A909B", fontSize: 13 }}>Aucune mise en avant confirmée pour l'instant.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {sorted.map((h, i) => (
@@ -1349,24 +1347,24 @@ function ReportsPanel({ reports, handled, onReportUpdate, onNav }) {
   return (
     <div style={{ marginTop: 44 }}>
       <h3 className="disp" style={{ fontSize: 20, margin: "0 0 14px" }}>Signalements ({reports.length})</h3>
-      {reports.length === 0 && <p className="sans" style={{ color: "#8a8272", fontSize: 13 }}>Aucun signalement en attente.</p>}
+      {reports.length === 0 && <p className="sans" style={{ color: "#8A909B", fontSize: 13 }}>Aucun signalement en attente.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {reports.map((r) => (
-          <div key={r.id} className="card" style={{ padding: 14, borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+          <div key={r.id} className="card" style={{ padding: 14, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
             <div>
               <button className="btn disp" onClick={() => onNav({ name: "profile", id: r.userId })} style={{ background: "transparent", padding: 0, fontSize: 15, textDecoration: "underline" }}>{r.userName}</button>
-              <p className="sans" style={{ fontSize: 12, color: "#6b6353", margin: "4px 0 0" }}>{r.reason}</p>
-              <p className="sans" style={{ fontSize: 11, color: "#a89f8c", margin: "4px 0 0" }}>Signalé par {r.from}</p>
+              <p className="sans" style={{ fontSize: 12, color: "#5A6270", margin: "4px 0 0" }}>{r.reason}</p>
+              <p className="sans" style={{ fontSize: 11, color: "#9AA0AA", margin: "4px 0 0" }}>Signalé par {r.from}</p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn" onClick={() => onReportUpdate({ ...r, status: "resolved" })} style={{ background: C.stamp, color: "#fff", padding: "8px 14px", borderRadius: 3, fontSize: 12 }}>Traité</button>
-              <button className="btn" onClick={() => onReportUpdate({ ...r, status: "dismissed" })} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#6b6353", padding: "8px 14px", borderRadius: 3, fontSize: 12 }}>Ignorer</button>
+              <button className="btn" onClick={() => onReportUpdate({ ...r, status: "resolved" })} style={{ background: C.stamp, color: "#fff", padding: "8px 14px", borderRadius: 8, fontSize: 12 }}>Traité</button>
+              <button className="btn" onClick={() => onReportUpdate({ ...r, status: "dismissed" })} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#5A6270", padding: "8px 14px", borderRadius: 8, fontSize: 12 }}>Ignorer</button>
             </div>
           </div>
         ))}
       </div>
       {handled.length > 0 && (
-        <details className="sans" style={{ marginTop: 16, fontSize: 12, color: "#8a8272" }}>
+        <details className="sans" style={{ marginTop: 16, fontSize: 12, color: "#8A909B" }}>
           <summary style={{ cursor: "pointer" }}>Signalements traités ({handled.length})</summary>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
             {handled.map((r) => (
@@ -1389,19 +1387,19 @@ function BoostRequestsPanel({ requests, onConfirmBoost, onRejectBoostRequest }) 
         <Rocket size={18} color={C.amberDeep} />
         <h3 className="disp" style={{ fontSize: 20, margin: 0 }}>Demandes de mise en avant ({requests.length})</h3>
       </div>
-      {requests.length === 0 && <p className="sans" style={{ color: "#8a8272", fontSize: 13 }}>Aucun paiement en attente de vérification.</p>}
+      {requests.length === 0 && <p className="sans" style={{ color: "#8A909B", fontSize: 13 }}>Aucun paiement en attente de vérification.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {requests.map((u) => (
-          <div key={u.id} className="card" style={{ padding: 14, borderRadius: 4, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div key={u.id} className="card" style={{ padding: 14, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div>
               <div className="disp" style={{ fontSize: 15 }}>{u.name}</div>
-              <p className="sans" style={{ fontSize: 12, color: "#6b6353", margin: "4px 0 0" }}>
+              <p className="sans" style={{ fontSize: 12, color: "#5A6270", margin: "4px 0 0" }}>
                 {u.boostRequest.days} jours · {fcfa(u.boostRequest.amount)} · réf. <b>{u.boostRequest.reference}</b>
               </p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn" onClick={() => onConfirmBoost(u)} style={{ background: C.stamp, color: "#fff", padding: "8px 14px", borderRadius: 3, display: "flex", alignItems: "center", gap: 5 }}><Check size={14} /> Paiement reçu</button>
-              <button className="btn" onClick={() => onRejectBoostRequest(u)} style={{ background: C.rust, color: "#fff", padding: "8px 14px", borderRadius: 3, display: "flex", alignItems: "center", gap: 5 }}><X size={14} /> Refuser</button>
+              <button className="btn" onClick={() => onConfirmBoost(u)} style={{ background: C.stamp, color: "#fff", padding: "8px 14px", borderRadius: 8, display: "flex", alignItems: "center", gap: 5 }}><Check size={14} /> Paiement reçu</button>
+              <button className="btn" onClick={() => onRejectBoostRequest(u)} style={{ background: C.rust, color: "#fff", padding: "8px 14px", borderRadius: 8, display: "flex", alignItems: "center", gap: 5 }}><X size={14} /> Refuser</button>
             </div>
           </div>
         ))}
@@ -1417,7 +1415,7 @@ function SuggestionsPanel({ suggestions, handled, onSuggestionUpdate, onAddCateg
         <Lightbulb size={18} color={C.amberDeep} />
         <h3 className="disp" style={{ fontSize: 20, margin: 0 }}>Suggestions des clients ({suggestions.length})</h3>
       </div>
-      {suggestions.length === 0 && <p className="sans" style={{ color: "#8a8272", fontSize: 13 }}>Aucune nouvelle suggestion.</p>}
+      {suggestions.length === 0 && <p className="sans" style={{ color: "#8A909B", fontSize: 13 }}>Aucune nouvelle suggestion.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {suggestions.map((s) => (
           <SuggestionRow key={s.id} s={s} onSuggestionUpdate={onSuggestionUpdate} onAddCategory={onAddCategory} />
@@ -1425,7 +1423,7 @@ function SuggestionsPanel({ suggestions, handled, onSuggestionUpdate, onAddCateg
       </div>
 
       {handled.length > 0 && (
-        <details className="sans" style={{ marginTop: 16, fontSize: 12, color: "#8a8272" }}>
+        <details className="sans" style={{ marginTop: 16, fontSize: 12, color: "#8A909B" }}>
           <summary style={{ cursor: "pointer" }}>Suggestions déjà traitées ({handled.length})</summary>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
             {handled.map((s) => (
@@ -1454,17 +1452,17 @@ function SuggestionRow({ s, onSuggestionUpdate, onAddCategory }) {
   };
 
   return (
-    <div className="card" style={{ padding: 14, borderRadius: 4 }}>
+    <div className="card" style={{ padding: 14, borderRadius: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
         <div>
           <p className="sans" style={{ margin: 0, fontSize: 14, color: C.ink }}>{s.text}</p>
-          <p className="sans" style={{ margin: "4px 0 0", fontSize: 11, color: "#8a8272" }}>Proposé par {s.from}</p>
+          <p className="sans" style={{ margin: "4px 0 0", fontSize: 11, color: "#8A909B" }}>Proposé par {s.from}</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          <button className="btn" onClick={() => setEditing((v) => !v)} style={{ background: C.amber, color: "#fff", padding: "7px 12px", borderRadius: 3, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+          <button className="btn" onClick={() => setEditing((v) => !v)} style={{ background: C.amber, color: "#fff", padding: "7px 12px", borderRadius: 8, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
             <Sparkles size={13} /> Créer une catégorie
           </button>
-          <button className="btn" onClick={() => onSuggestionUpdate({ ...s, status: "dismissed" })} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#6b6353", padding: "7px 12px", borderRadius: 3, fontSize: 12 }}>
+          <button className="btn" onClick={() => onSuggestionUpdate({ ...s, status: "dismissed" })} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#5A6270", padding: "7px 12px", borderRadius: 8, fontSize: 12 }}>
             Ignorer
           </button>
         </div>
@@ -1477,7 +1475,7 @@ function SuggestionRow({ s, onSuggestionUpdate, onAddCategory }) {
             <option value="zap">Électricité</option>
             <option value="bag">Vente</option>
           </select>
-          <button className="btn" onClick={createCategory} style={{ background: C.stamp, color: "#fff", padding: "0 16px", borderRadius: 3 }}>Valider</button>
+          <button className="btn" onClick={createCategory} style={{ background: C.stamp, color: "#fff", padding: "0 16px", borderRadius: 8 }}>Valider</button>
         </div>
       )}
     </div>
@@ -1524,7 +1522,7 @@ function CategoryManager({ categories, users, onAddCategory, onRenameCategory, o
       <h3 className="disp" style={{ fontSize: 20, margin: "0 0 14px" }}>Catégories du site ({categories.length})</h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
         {categories.map((c) => (
-          <div key={c.id} className="card" style={{ padding: "8px 12px", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div key={c.id} className="card" style={{ padding: "8px 12px", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
             {editingId === c.id ? (
               <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveEdit(c.id)} style={{ ...inputStyle, flex: 1, padding: "6px 10px" }} />
             ) : (
@@ -1532,29 +1530,29 @@ function CategoryManager({ categories, users, onAddCategory, onRenameCategory, o
             )}
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               {editingId === c.id ? (
-                <button className="btn sans" onClick={() => saveEdit(c.id)} style={{ background: C.stamp, color: "#fff", padding: "5px 10px", borderRadius: 3, fontSize: 11 }}>Sauver</button>
+                <button className="btn sans" onClick={() => saveEdit(c.id)} style={{ background: C.stamp, color: "#fff", padding: "5px 10px", borderRadius: 8, fontSize: 11 }}>Sauver</button>
               ) : (
-                <button className="btn sans" onClick={() => startEdit(c)} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#6b6353", padding: "5px 10px", borderRadius: 3, fontSize: 11 }}>Renommer</button>
+                <button className="btn sans" onClick={() => startEdit(c)} style={{ background: "transparent", border: `1px solid ${C.line}`, color: "#5A6270", padding: "5px 10px", borderRadius: 8, fontSize: 11 }}>Renommer</button>
               )}
-              <button className="btn sans" onClick={() => remove(c)} style={{ background: "transparent", color: C.rust, padding: "5px 10px", borderRadius: 3, fontSize: 11 }}>Supprimer</button>
+              <button className="btn sans" onClick={() => remove(c)} style={{ background: "transparent", color: C.rust, padding: "5px 10px", borderRadius: 8, fontSize: 11 }}>Supprimer</button>
             </div>
           </div>
         ))}
       </div>
       {!open ? (
-        <button className="btn" onClick={() => setOpen(true)} style={{ background: C.ink, color: "#fff", padding: "10px 16px", borderRadius: 3, display: "flex", alignItems: "center", gap: 6 }}>
+        <button className="btn" onClick={() => setOpen(true)} style={{ background: C.ink, color: "#fff", padding: "10px 16px", borderRadius: 8, display: "flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} /> Ajouter une catégorie
         </button>
       ) : (
-        <div className="card" style={{ padding: 14, borderRadius: 4, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="card" style={{ padding: 14, borderRadius: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex. : Menuiserie" style={{ ...inputStyle, flex: "1 1 180px" }} />
           <select value={icon} onChange={(e) => setIcon(e.target.value)} style={inputStyle}>
             <option value="wrench">Outil</option>
             <option value="zap">Électricité</option>
             <option value="bag">Vente</option>
           </select>
-          <button className="btn" onClick={submit} style={{ background: C.stamp, color: "#fff", padding: "10px 16px", borderRadius: 3 }}>Créer</button>
-          <button className="btn" onClick={() => setOpen(false)} style={{ background: "transparent", color: "#8a8272", padding: "10px 6px" }}>Annuler</button>
+          <button className="btn" onClick={submit} style={{ background: C.stamp, color: "#fff", padding: "10px 16px", borderRadius: 8 }}>Créer</button>
+          <button className="btn" onClick={() => setOpen(false)} style={{ background: "transparent", color: "#8A909B", padding: "10px 6px" }}>Annuler</button>
         </div>
       )}
     </div>
